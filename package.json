@@ -1,7 +1,7 @@
 {
-  "name": "@noblackbox/bridge",
+  "name": "@nowarelabs/bridge",
   "version": "1.0.0",
-  "description": "Local terminal bridge for NoBlackBox editor",
+  "description": "Local terminal bridge for Nowarelabs editor",
   "main": "dist/index.js",
   "bin": {
     "nbb": "./dist/index.js"
