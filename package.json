@@ -1,13 +1,10 @@
 {
-  "name": "@nowarelabs/bridge",
+  "name": "nowarelabs-bridge",
   "version": "1.0.0",
   "description": "Local terminal bridge for Nowarelabs editor",
   "main": "dist/index.js",
   "bin": {
     "nbb": "./dist/index.js"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "build": "tsc",
