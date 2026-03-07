@@ -1,0 +1,139 @@
+#!/usr/bin/env node
+
+import WebSocket from "ws";
+import * as pty from "node-pty";
+import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
+
+const PORT = parseInt(process.env.PORT || "3001", 10);
+
+const wss = new WebSocket.Server({
+  port: PORT,
+  host: "127.0.0.1",
+});
+
+console.log(`
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║       NoBlackBox Terminal Bridge                          ║
+║                                                           ║
+║   Port: ${PORT}                                           ║
+║   URL:  ws://localhost:${PORT}                            ║
+║                                                           ║
+║   Waiting for editor connection...                        ║
+║                                                           ║
+║   Press Ctrl+C to stop                                    ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+`);
+
+wss.on("connection", (ws) => {
+  console.log("✓ Editor connected");
+
+  // Optional token for simple auth (local-only). If set, the client must send
+  // { type: 'auth', token: '...'} as the first message after connecting.
+  const REQUIRED_TOKEN = process.env.TERMINAL_BRIDGE_TOKEN;
+
+  let shell: string;
+  if (os.platform() === "win32") {
+    shell = "powershell.exe";
+  } else {
+    const shells = ["/bin/bash", "/bin/zsh", "/usr/bin/bash", "/usr/bin/zsh"];
+    shell = (process.env.SHELL && fs.existsSync(process.env.SHELL))
+      ? process.env.SHELL
+      : shells.find((s) => fs.existsSync(s)) || "/bin/bash";
+  }
+  console.log(`  Using shell: ${shell}`);
+
+  const cwd = process.env.HOME || process.env.TMPDIR || "/tmp";
+
+  const ptyProcess = pty.spawn(shell, [], {
+    name: "xterm-256color",
+    cols: 80,
+    rows: 30,
+    cwd,
+    env: process.env as { [key: string]: string },
+  });
+
+  // Send PTY data wrapped in JSON for a clear protocol
+  ptyProcess.onData((data: string) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({ type: "data", data }));
+      } catch (err) {
+        // ignore send errors for now
+      }
+    }
+  });
+
+  let authenticated = !REQUIRED_TOKEN; // if no token required, treat as authed
+
+  ws.on("message", (data: WebSocket.Data) => {
+    // Expect JSON protocol messages from client
+    let msg: any;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch (err) {
+      // Legacy/raw fallback: treat as raw input
+      if (ptyProcess) ptyProcess.write(data.toString());
+      return;
+    }
+
+    if (!authenticated) {
+      if (msg && msg.type === "auth" && msg.token === REQUIRED_TOKEN) {
+        authenticated = true;
+        ws.send(JSON.stringify({ type: "auth", ok: true }));
+      } else {
+        ws.send(JSON.stringify({ type: "error", message: "authentication required" }));
+        ws.close();
+      }
+      return;
+    }
+
+    switch (msg.type) {
+      case "input":
+        if (typeof msg.data === "string") ptyProcess.write(msg.data);
+        break;
+      case "resize":
+        if (typeof msg.cols === "number" && typeof msg.rows === "number") {
+          ptyProcess.resize(msg.cols, msg.rows);
+        }
+        break;
+      default:
+        // unknown message type
+        break;
+    }
+  });
+
+  ws.on("close", () => {
+    console.log("✗ Editor disconnected");
+    try {
+      ptyProcess.kill();
+    } catch {}
+  });
+
+  ptyProcess.onExit(({ exitCode }) => {
+    console.log(`⚠ Terminal exited with code ${exitCode}`);
+    try {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "exit", code: exitCode }));
+    } catch {}
+    try {
+      ws.close();
+    } catch {}
+  });
+});
+
+function shutdown(signal: string) {
+  console.log(`\n👋 Shutting down bridge... (${signal})`);
+  try {
+    wss.clients.forEach((c) => c.close());
+    wss.close();
+  } catch (err) {
+    // ignore
+  }
+  process.exit(0);
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

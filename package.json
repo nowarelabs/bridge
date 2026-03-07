@@ -1,0 +1,28 @@
+{
+  "name": "@noblackbox/bridge",
+  "version": "1.0.0",
+  "description": "Local terminal bridge for NoBlackBox editor",
+  "main": "dist/index.js",
+  "bin": {
+    "nbb": "./dist/index.js"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "postinstall": "node -e \"const fs=require('fs');const p='node_modules/node-pty/prebuilds';try{fs.chmodSync(p+'/darwin-arm64/spawn-helper',0o755);fs.chmodSync(p+'/darwin-x64/spawn-helper',0o755);fs.chmodSync(p+'/win32-x64/spawn-helper.exe',0o755);fs.chmodSync(p+'/win32-arm64/spawn-helper.exe',0o755);console.log('Fixed spawn-helper permissions')}catch(e){console.log('No prebuilds found')}\""
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}
