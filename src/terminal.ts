@@ -7,6 +7,8 @@ export type TerminalProcess = {
   kill: () => void;
   onData: (cb: (d: string) => void) => void;
   onExit: (cb: (code: number | null) => void) => void;
+  // true when this process is the pipe-based fallback (no real PTY)
+  isFallback?: boolean;
 };
 
 export type SpawnOptions = {
@@ -44,6 +46,7 @@ export function createTerminal(shell: string, args: string[] = [], opts: SpawnOp
       kill: () => { try { ptyProcess.kill(); } catch {} },
       onData: (cb: (d: string) => void) => ptyProcess.onData(cb),
       onExit: (cb: (code: number | null) => void) => ptyProcess.onExit(({ exitCode }: any) => cb(exitCode)),
+      isFallback: false,
     };
   } catch (err) {
     // Fallback: use child_process.spawn with stdio pipes. This is not a real
@@ -86,6 +89,7 @@ export function createTerminal(shell: string, args: string[] = [], opts: SpawnOp
       },
       onData: (cb: (d: string) => void) => { dataCb = cb; },
       onExit: (cb: (code: number | null) => void) => child.on("exit", (code: number | null) => cb(code)),
+      isFallback: true,
     };
   }
 }
