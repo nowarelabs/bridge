@@ -1,6 +1,6 @@
 {
   "name": "nowarelabs-bridge",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Local terminal bridge for Nowarelabs editor",
   "main": "dist/index.js",
   "bin": {

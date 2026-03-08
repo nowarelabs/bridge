@@ -36,6 +36,8 @@ export function createTerminal(shell: string, args: string[] = [], opts: SpawnOp
       env: opts.env || process.env,
     });
 
+    console.log("[terminal] backend=node-pty");
+
     return {
       write: (data: string) => ptyProcess.write(data),
       resize: (c: number, r: number) => ptyProcess.resize(c, r),
@@ -47,11 +49,20 @@ export function createTerminal(shell: string, args: string[] = [], opts: SpawnOp
     // Fallback: use child_process.spawn with stdio pipes. This is not a real
     // PTY: programs that require a tty may not work correctly. However, many
     // shells and commands still behave well enough for simple use.
-    const child = spawnChild(shell, args, {
+    // If we're falling back to pipes and the requested shell is bash/zsh,
+    // add '-i' so the shell runs in interactive mode and responds to stdin.
+    const fallbackArgs = [...args];
+    if (!fallbackArgs.length && /(?:bash|zsh)$/i.test(shell) && process.platform !== 'win32') {
+      fallbackArgs.push('-i');
+    }
+
+    const child = spawnChild(shell, fallbackArgs, {
       cwd: opts.cwd,
       env: opts.env || process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
+
+    console.log("[terminal] backend=fallback-child_process", { shell, args: fallbackArgs });
 
     let dataCb: ((d: string) => void) | null = null;
     child.stdout.on("data", (chunk: Buffer | string) => {

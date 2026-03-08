@@ -55,8 +55,48 @@ wss.on("connection", (ws) => {
     env: process.env as { [key: string]: string },
   });
 
+  // Detect whether the terminal backend is a fallback (pipe-based) so we can
+  // apply a small echo-suppression heuristic to avoid duplicated characters
+  // when shells echo input repeatedly under pipe-based fallbacks.
+  const isFallback = Boolean((ptyProcess as any).isFallback);
+  let lastWriteTime = 0;
+  let suppressionTimer: NodeJS.Timeout | null = null;
+  let bufferedData = "";
+  const SUPPRESSION_MS = 60;
+
+  function flushBuffered() {
+    suppressionTimer = null;
+    if (!bufferedData) return;
+    // If the buffered data is a short repeated single character (like "hhhhhhh"),
+    // drop it — it's very likely an echo artifact. Otherwise forward it.
+    const m = bufferedData.match(/^([^\r\n])\1+$/);
+    if (m && bufferedData.length <= 16) {
+      // drop
+      bufferedData = "";
+      return;
+    }
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({ type: "data", data: bufferedData }));
+      } catch {}
+    }
+    bufferedData = "";
+  }
+
   // Send PTY data wrapped in JSON for a clear protocol
   ptyProcess.onData((data: string) => {
+    if (isFallback) {
+      const now = Date.now();
+      // If data arrives shortly after a client write, buffer and suppress
+      // obvious repeated-character echoes.
+      if (now - lastWriteTime < SUPPRESSION_MS) {
+        bufferedData += data;
+        if (suppressionTimer) clearTimeout(suppressionTimer);
+        suppressionTimer = setTimeout(flushBuffered, SUPPRESSION_MS);
+        return;
+      }
+      // No suppression active — send immediately
+    }
     if (ws.readyState === WebSocket.OPEN) {
       try {
         ws.send(JSON.stringify({ type: "data", data }));
