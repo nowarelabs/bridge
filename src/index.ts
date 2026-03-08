@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import WebSocket from "ws";
-import * as pty from "node-pty";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
+import { createTerminal } from "./terminal";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
 
@@ -48,8 +48,7 @@ wss.on("connection", (ws) => {
 
   const cwd = process.env.HOME || process.env.TMPDIR || "/tmp";
 
-  const ptyProcess = pty.spawn(shell, [], {
-    name: "xterm-256color",
+  const ptyProcess = createTerminal(shell, [], {
     cols: 80,
     rows: 30,
     cwd,
@@ -113,10 +112,10 @@ wss.on("connection", (ws) => {
     } catch {}
   });
 
-  ptyProcess.onExit(({ exitCode }) => {
-    console.log(`⚠ Terminal exited with code ${exitCode}`);
+  ptyProcess.onExit((code: number | null) => {
+    console.log(`⚠ Terminal exited with code ${code}`);
     try {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "exit", code: exitCode }));
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "exit", code }));
     } catch {}
     try {
       ws.close();
