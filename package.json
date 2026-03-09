@@ -1,6 +1,6 @@
 {
   "name": "nowarelabs-bridge",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Local terminal bridge for Nowarelabs editor",
   "main": "dist/index.js",
   "bin": {
@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "postinstall": "node -e \"const fs=require('fs');const p='node_modules/node-pty/prebuilds';try{fs.chmodSync(p+'/darwin-arm64/spawn-helper',0o755);fs.chmodSync(p+'/darwin-x64/spawn-helper',0o755);fs.chmodSync(p+'/win32-x64/spawn-helper.exe',0o755);fs.chmodSync(p+'/win32-arm64/spawn-helper.exe',0o755);console.log('Fixed spawn-helper permissions')}catch(e){console.log('No prebuilds found')}\""
+    "postinstall": "node -e \"const fs=require('fs'),p=require('path'),dir=p.join(__dirname,'node_modules');function fix(d){try{const a=p.join(d,'spawn-helper'),b=p.join(d,'pty.node');fs.existsSync(a)&&fs.chmodSync(a,0o755);fs.existsSync(b)&&fs.chmodSync(b,0o755)}catch(e){}}['darwin-arm64','darwin-x64','win32-x64','win32-arm64'].forEach(x=>fix(p.join(dir,'node-pty','prebuilds',x)));console.log('Fixed node-pty permissions')\""
   },
   "dependencies": {
     "node-pty": "^1.0.0",
