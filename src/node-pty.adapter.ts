@@ -1,5 +1,18 @@
-import { ITerminalAdapter } from './terminal-adapter.interface';
+import { ITerminalAdapter, ITerminalAdapterFactory } from './terminal-adapter.interface';
 import { SpawnOptions } from './interfaces';
+
+let nodePtyModule: any = null;
+
+function loadNodePty(): boolean {
+  if (nodePtyModule !== null) return nodePtyModule !== false;
+  try {
+    nodePtyModule = require('node-pty');
+    return true;
+  } catch {
+    nodePtyModule = false;
+    return false;
+  }
+}
 
 export class NodePtyAdapter implements ITerminalAdapter {
   private ptyProcess: any;
@@ -35,17 +48,10 @@ export class NodePtyAdapter implements ITerminalAdapter {
   }
 }
 
-export class NodePtyAdapterFactory {
+export class NodePtyAdapterFactory implements ITerminalAdapterFactory {
   private static instance: NodePtyAdapterFactory | null = null;
-  private nodePty: any = null;
 
-  private constructor() {
-    try {
-      this.nodePty = require('node-pty');
-    } catch {
-      this.nodePty = null;
-    }
-  }
+  private constructor() {}
 
   static getInstance(): NodePtyAdapterFactory {
     if (!NodePtyAdapterFactory.instance) {
@@ -55,7 +61,7 @@ export class NodePtyAdapterFactory {
   }
 
   create(options: SpawnOptions, shell: string): ITerminalAdapter {
-    if (!this.nodePty) {
+    if (!loadNodePty()) {
       throw new Error('node-pty is not available');
     }
 
@@ -63,18 +69,22 @@ export class NodePtyAdapterFactory {
     const rows = options.rows || 30;
     const args = options.args || [];
 
-    const ptyProcess = this.nodePty.spawn(shell, args, {
-      name: 'xterm-256color',
-      cols,
-      rows,
-      cwd: options.cwd,
-      env: options.env || process.env,
-    });
+    try {
+      const ptyProcess = nodePtyModule.spawn(shell, args, {
+        name: 'xterm-256color',
+        cols,
+        rows,
+        cwd: options.cwd,
+        env: options.env || process.env,
+      });
 
-    return new NodePtyAdapter(ptyProcess);
+      return new NodePtyAdapter(ptyProcess);
+    } catch (spawnError: any) {
+      throw new Error(`node-pty spawn failed: ${spawnError.message}`);
+    }
   }
 
   supportsTruePty(): boolean {
-    return this.nodePty !== null;
+    return loadNodePty();
   }
 }

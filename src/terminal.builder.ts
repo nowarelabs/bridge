@@ -62,6 +62,18 @@ export class TerminalBuilder {
 
   build(): ITerminalAdapter {
     const factory = this.selectAdapterFactory();
+    
+    if (factory === NodePtyAdapterFactory.getInstance()) {
+      try {
+        return factory.create(this.options, this.shell);
+      } catch (error: any) {
+        if (error.message?.includes('node-pty spawn failed') || error.message?.includes('node-pty is not available')) {
+          return FallbackAdapterFactory.getInstance().create(this.options, this.shell);
+        }
+        throw error;
+      }
+    }
+    
     return factory.create(this.options, this.shell);
   }
 }
