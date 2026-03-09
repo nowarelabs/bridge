@@ -68,7 +68,6 @@ export class FallbackAdapterFactory {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    console.log('[terminal] backend=fallback-child_process', { shell, args });
     return new FallbackAdapter(child);
   }
 

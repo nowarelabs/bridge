@@ -38,8 +38,6 @@ export function createTerminal(shell: string, args: string[] = [], opts: SpawnOp
       env: opts.env || process.env,
     });
 
-    console.log("[terminal] backend=node-pty");
-
     return {
       write: (data: string) => ptyProcess.write(data),
       resize: (c: number, r: number) => ptyProcess.resize(c, r),
@@ -64,8 +62,6 @@ export function createTerminal(shell: string, args: string[] = [], opts: SpawnOp
       env: opts.env || process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
-
-    console.log("[terminal] backend=fallback-child_process", { shell, args: fallbackArgs });
 
     let dataCb: ((d: string) => void) | null = null;
     child.stdout.on("data", (chunk: Buffer | string) => {

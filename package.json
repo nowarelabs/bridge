@@ -1,6 +1,6 @@
 {
   "name": "nowarelabs-bridge",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Local terminal bridge for Nowarelabs editor",
   "main": "dist/index.js",
   "bin": {
@@ -13,6 +13,7 @@
     "postinstall": "node -e \"const fs=require('fs'),p=require('path'),dir=p.join(__dirname,'node_modules');function fix(d){try{const a=p.join(d,'spawn-helper'),b=p.join(d,'pty.node');fs.existsSync(a)&&fs.chmodSync(a,0o755);fs.existsSync(b)&&fs.chmodSync(b,0o755)}catch(e){}}['darwin-arm64','darwin-x64','win32-x64','win32-arm64'].forEach(x=>fix(p.join(dir,'node-pty','prebuilds',x)));console.log('Fixed node-pty permissions')\""
   },
   "dependencies": {
+    "cli-boxes": "^3.0.0",
     "node-pty": "^1.0.0",
     "ws": "^8.14.0"
   },

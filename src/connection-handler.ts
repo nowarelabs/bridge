@@ -71,7 +71,6 @@ export class ConnectionHandler {
   }
 
   private handleDisconnect(): void {
-    console.log('✗ Editor disconnected');
     if (this.config.getOwnerGraceMs() <= 0) {
       this.manager.closeAll();
     } else {

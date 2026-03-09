@@ -71,7 +71,6 @@ export class NodePtyAdapterFactory {
       env: options.env || process.env,
     });
 
-    console.log('[terminal] backend=node-pty');
     return new NodePtyAdapter(ptyProcess);
   }
 

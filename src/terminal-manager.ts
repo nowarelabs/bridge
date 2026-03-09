@@ -58,7 +58,9 @@ export class TerminalManager {
       .setEnv(process.env as { [key: string]: string })
       .build();
 
-    console.log(`[terminal ${id}] created with backend: ${proc.isFallback() ? 'fallback' : 'node-pty'}, shell: ${shellPath}`);
+    if ((globalThis as any).__registerTerminal) {
+      (globalThis as any).__registerTerminal({ id: id.toString(), shell: shellPath, createdAt: Date.now() });
+    }
 
     const terminal = new TerminalEntry(
       id,
@@ -90,13 +92,11 @@ export class TerminalManager {
     this.setupTerminalEvents(terminal);
     terminal.resetIdle();
 
-    console.log(`Terminal ${id} created for connection (token=${token})`);
     return { id, token };
   }
 
   private setupTerminalEvents(terminal: TerminalEntry): void {
     terminal.proc.onData((data: string) => {
-      console.log(`[terminal ${terminal.id}] data received:`, data.substring(0, 50));
       const lastWrite = this.writeTimestamps.get(terminal.id) || 0;
       if (terminal.isFallback() && (Date.now() - lastWrite) < this.SUPPRESSION_MS) {
         const match = data.match(/^([^\r\n])\1+$/);
@@ -109,7 +109,6 @@ export class TerminalManager {
         data,
       });
       terminal.resetIdle();
-      console.log(`[terminal ${terminal.id}] sending to owner, owner open:`, terminal.owner.readyState === WebSocket.OPEN);
       terminal.sendToOwner({ type: 'data', id: terminal.id, data });
     });
 
@@ -127,9 +126,7 @@ export class TerminalManager {
 
   input(id: number, data: string): boolean {
     const terminal = this.terminals.get(id);
-    console.log(`[terminal ${id}] input received:`, data);
     if (!terminal || terminal.closed || !terminal.isOwner(this.owner)) {
-      console.log(`[terminal ${id}] input failed: not found or not owner`);
       return false;
     }
     terminal.write(data);
@@ -207,7 +204,9 @@ export class TerminalManager {
       this.tokenMap.delete(terminal.token);
       this.ownedIds.delete(id);
       this.onTerminalClosed?.(id);
-      console.log(`Terminal ${id} closed`);
+      if ((globalThis as any).__unregisterTerminal) {
+        (globalThis as any).__unregisterTerminal(id.toString());
+      }
     }
   }
 
