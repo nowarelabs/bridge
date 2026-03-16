@@ -33,6 +33,10 @@ let httpPort = START_PORT + 10000;
 let lastLineCount = 0;
 let rendered = false;
 
+function getTerminalWidth(): number {
+  return process.stdout.columns || 80;
+}
+
 function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
@@ -44,62 +48,59 @@ function pad(str: string, len: number): string {
 function render() {
   const lines: string[] = [];
   
+  const termWidth = getTerminalWidth();
+  const minWidth = 50;
+  const boxWidth = Math.max(minWidth, termWidth - 2);
+  
   const tl = '┌', tr = '┐', bl = '└', br = '┘';
   const ml = '├', mr = '┤', v = '│', h = '─';
+  
+  const innerWidth = boxWidth - 4;
   
   const wsUrl = `ws://localhost:${port}`;
   const infoUrl = `http://localhost:${httpPort}/bridge-info`;
   
-  const leftWidth = 14;
-  const rightWidth = Math.max(
-    wsUrl.length,
-    infoUrl.length,
-    'Waiting for connection...'.length,
-    'Connected (1 client)'.length
-  ) + 2;
-  const innerWidth = leftWidth + rightWidth + 1;
-  
-  const title = ' NoBlackBox Terminal Bridge ';
-  const titleLen = Math.max(title.length, innerWidth);
-  
-  const dataLines: [string, string][] = [
-    ['WebSocket', port.toString()],
-    ['HTTP Info', httpPort.toString()],
-    ['URL', wsUrl],
-    ['Discovery', infoUrl],
-  ];
+  const truncate = (s: string, n: number): string => {
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  };
   
   const status = connections > 0
     ? c.green + '●' + c.reset + ' Connected (' + connections + ' client' + (connections !== 1 ? 's' : '') + ')'
     : c.yellow + '○' + c.reset + ' Waiting for connection...';
   
-  lines.push(c.cyan + tl + h.repeat(titleLen + 2) + tr + c.reset);
-  lines.push(c.cyan + v + c.reset + c.bold + c.cyan + pad(title, titleLen + 2) + c.reset + c.cyan + v + c.reset);
-  lines.push(c.cyan + ml + h.repeat(titleLen + 2) + mr + c.reset);
+  const dataLines: [string, string][] = [
+    ['WebSocket', port.toString()],
+    ['HTTP Info', httpPort.toString()],
+    ['URL', truncate(wsUrl, innerWidth - 18)],
+    ['Discovery', truncate(infoUrl, innerWidth - 18)],
+  ];
+  
+  lines.push(c.cyan + tl + h.repeat(innerWidth) + tr + c.reset);
+  lines.push(c.cyan + v + c.reset + c.bold + c.cyan + pad(' NoBlackBox Terminal Bridge ', innerWidth) + c.reset + c.cyan + v + c.reset);
+  lines.push(c.cyan + ml + h.repeat(innerWidth) + mr + c.reset);
   
   for (const [label, value] of dataLines) {
     const left = '  ' + c.gray + label + c.reset + ':';
-    const right = label === 'URL' ? c.green + value + c.reset : value;
-    const line = pad(left, leftWidth + 3) + pad(right, rightWidth);
-    lines.push(c.cyan + v + c.reset + line + c.cyan + v + c.reset);
+    const right = label === 'URL' || label === 'Discovery' ? c.green + value + c.reset : value;
+    lines.push(c.cyan + v + c.reset + pad(left, 18) + right + c.cyan + v + c.reset);
   }
   
-  lines.push(c.cyan + ml + h.repeat(titleLen + 2) + mr + c.reset);
-  lines.push(c.cyan + v + c.reset + pad('  ' + status, titleLen + 2) + c.cyan + v + c.reset);
+  lines.push(c.cyan + ml + h.repeat(innerWidth) + mr + c.reset);
+  lines.push(c.cyan + v + c.reset + pad('  ' + status, innerWidth) + c.cyan + v + c.reset);
   
   if (terminals.length > 0) {
-    lines.push(c.cyan + ml + h.repeat(titleLen + 2) + mr + c.reset);
-    lines.push(c.cyan + v + c.reset + pad('  Terminals: ' + terminals.length, titleLen + 2) + c.cyan + v + c.reset);
+    lines.push(c.cyan + ml + h.repeat(innerWidth) + mr + c.reset);
+    lines.push(c.cyan + v + c.reset + pad('  Terminals: ' + terminals.length, innerWidth) + c.cyan + v + c.reset);
     for (const t of terminals.slice(0, 3)) {
-      const line = '    ' + t.id.slice(0, 8) + '  ' + t.shell;
-      lines.push(c.cyan + v + c.reset + pad(line, titleLen + 2) + c.cyan + v + c.reset);
+      const line = '    ' + t.id.slice(0, 8) + '  ' + truncate(t.shell, innerWidth - 20);
+      lines.push(c.cyan + v + c.reset + pad(line, innerWidth) + c.cyan + v + c.reset);
     }
     if (terminals.length > 3) {
-      lines.push(c.cyan + v + c.reset + pad('    ... +' + (terminals.length - 3) + ' more', titleLen + 2) + c.cyan + v + c.reset);
+      lines.push(c.cyan + v + c.reset + pad('    ... +' + (terminals.length - 3) + ' more', innerWidth) + c.cyan + v + c.reset);
     }
   }
   
-  lines.push(c.cyan + bl + h.repeat(titleLen + 2) + br + c.reset);
+  lines.push(c.cyan + bl + h.repeat(innerWidth) + br + c.reset);
   lines.push(c.dim + '  Press Ctrl+C to stop' + c.reset);
   
   // Use cursor positioning to update in place
@@ -199,6 +200,10 @@ async function startServer(WSport: number): Promise<void> {
     try { httpServer.close(); wss.clients.forEach((c) => c.close()); wss.close(); } catch {}
     process.exit(0);
   };
+  process.on('SIGWINCH', () => {
+    rendered = false;
+    render();
+  });
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
